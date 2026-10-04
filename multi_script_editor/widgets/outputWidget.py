@@ -180,7 +180,11 @@ class outputClass(BaseTextWidgetMixin, QPlainTextEdit):
         else:
             menu.addAction(clear_act)
 
-        menu.exec_(event.globalPos())
+        pos = event.globalPosition().toPoint() if hasattr(event, "globalPosition") else event.globalPos()
+        if hasattr(menu, "exec"):
+            menu.exec(pos)
+        else:
+            menu.exec_(pos)
         del menu
 
     def search(self, text=None, case_sensitive=False):

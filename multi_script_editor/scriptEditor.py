@@ -1568,13 +1568,19 @@ class scriptEditorClass(QMainWindow, ui.Ui_scriptEditor):
             self.execute_command_requested.emit(text, self.print_command_act.isChecked(), self.clear_exec_act.isChecked())
 
     def executeSelected(self):
+        if getattr(self, "_executing_selected", False):
+            return
         if hasattr(self, 'execSel_act') and not self.execSel_act.isEnabled():
             return
-        text = self.tab.getCurrentSelectedText()
-        if self.print_command_act.isChecked():
-            text += '\n# Execute Selected'
-        if text:
-            self.execute_command_requested.emit(text, self.print_command_act.isChecked(), self.clear_exec_act.isChecked())
+        self._executing_selected = True
+        try:
+            text = self.tab.getCurrentSelectedText()
+            if self.print_command_act.isChecked():
+                text += '\n# Execute Selected'
+            if text:
+                self.execute_command_requested.emit(text, self.print_command_act.isChecked(), self.clear_exec_act.isChecked())
+        finally:
+            self._executing_selected = False
 
     def deleteLine(self):
         i = self.tab.currentIndex()
@@ -3534,6 +3540,11 @@ class scriptEditorClass(QMainWindow, ui.Ui_scriptEditor):
         self._embeddedPanel = panel
         panel.installEventFilter(self)
         panel.destroyed.connect(self._on_embedded_panel_destroyed)
+        # Re-host execute shortcuts on the visible embedded panel (Gaffer).
+        for act_name in ("execSel_act", "execAll_act", "execLine_act"):
+            act = getattr(self, act_name, None)
+            if act is not None:
+                panel.addAction(act)
         return panel
 
     def _on_embedded_panel_destroyed(self, *args):

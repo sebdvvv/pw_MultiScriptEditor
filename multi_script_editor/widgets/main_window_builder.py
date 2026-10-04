@@ -177,13 +177,13 @@ class ScriptEditorUIBuilder:
             editor.execSel_act,
             editor.executeSelected,
             shortcut=('Ctrl+Return', 'Ctrl+Enter'),
-            context=Qt.ApplicationShortcut,
+            context=Qt.WidgetWithChildrenShortcut,
         )
         configure(
             editor.execAll_act,
             editor.executeAll,
             shortcut='Alt+Return',
-            context=Qt.ApplicationShortcut,
+            context=Qt.WidgetWithChildrenShortcut,
         )
         editor.execAll_act.setProperty('contextualShortcuts', ['Enter'])
         editor.execAll_act.setProperty('activeContextualShortcuts', ['Enter'])
@@ -191,7 +191,7 @@ class ScriptEditorUIBuilder:
             editor.execLine_act,
             editor.executeLine,
             shortcut=('Ctrl+Shift+Return', 'Ctrl+Shift+Enter'),
-            context=Qt.ApplicationShortcut,
+            context=Qt.WidgetWithChildrenShortcut,
         )
 
         configure(editor.clearHistory_act, editor.clearHistory, shortcut='Ctrl+Shift+C')

@@ -174,6 +174,9 @@ class MultiCursorManager:
                 for cursor in sorted_cursors:
                     cursor.deleteChar()
             elif key in [Qt.Key_Return, Qt.Key_Enter]:
+                # Ctrl+Enter is execute-selected; do not consume it here.
+                if modifiers & Qt.ControlModifier:
+                    return False
                 is_edit = True
                 for cursor in sorted_cursors:
                     cursor.insertText("\n")

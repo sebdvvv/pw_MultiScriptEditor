@@ -1140,6 +1140,24 @@ class inputClass(BaseTextWidgetMixin, QPlainTextEdit):
         if text and (text.isalnum() or text in ['.', '_']):
             self._suppress_autocomplete = False
 
+        # Ctrl+Enter / Ctrl+Return -> execute (handle early; Gaffer may not
+        # deliver ApplicationShortcut from a hidden QMainWindow reliably).
+        mods = event.modifiers()
+        ctrl = bool(mods & Qt.ControlModifier)
+        alt = bool(mods & Qt.AltModifier)
+        shift = bool(mods & Qt.ShiftModifier)
+        meta = bool(mods & Qt.MetaModifier)
+        if (
+            ctrl
+            and not alt
+            and not shift
+            and not meta
+            and event.key() in (Qt.Key_Return, Qt.Key_Enter)
+        ):
+            self.executeSignal.emit()
+            event.accept()
+            return
+
         # Multi-cursor interception
         if self.multi_cursor_manager.handle_key_press(event):
             return
@@ -1158,17 +1176,6 @@ class inputClass(BaseTextWidgetMixin, QPlainTextEdit):
             return
         if event.matches(QKeySequence.Redo):
             self.redo()
-            return
-
-        # Ctrl+Enter / Ctrl+Return -> execute selected (main Enter and numpad)
-        if (
-            (event.modifiers() & Qt.ControlModifier)
-            and not (event.modifiers() & Qt.AltModifier)
-            and not (event.modifiers() & Qt.ShiftModifier)
-            and event.key() in [Qt.Key_Return, Qt.Key_Enter]
-        ):
-            self.executeSignal.emit()
-            event.accept()
             return
 
         # apply complete / newline (plain Enter or Shift+Enter)
