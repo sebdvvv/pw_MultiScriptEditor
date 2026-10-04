@@ -26,6 +26,7 @@ from core.session_model import (
     prepare_tabs_for_session_save,
 )
 from core.settings_model import SettingsModel, SnippetsModel, ThemesModel
+from core.qt_utils import qt_object_is_alive
 from icons import icons
 from presenters.main_presenter import MainPresenter
 from style.links import links
@@ -45,13 +46,16 @@ from vendor.Qt.QtWidgets import (
     QLineEdit,
     QMainWindow,
     QMenu,
+    QMenuBar,
     QMessageBox,
     QPlainTextEdit,
     QPushButton,
+    QSizePolicy,
     QSplitter,
     QStyle,
     QTabWidget,
     QToolBar,
+    QToolButton,
     QToolTip,
     QVBoxLayout,
     QWidget,
@@ -135,16 +139,24 @@ class scriptEditorClass(QMainWindow, ui.Ui_scriptEditor):
     save_settings_requested = Signal(dict)
     load_settings_requested = Signal()
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, embedded=False):
         super(scriptEditorClass, self).__init__(parent)
+        self.embedded = bool(embedded)
+        self._embeddedPanel = None
+        self._executeWrapper = None
         # ui
         py_ver = sys.version.split(' ')[0]
-        self.ver = f"{__version__} · Python-{py_ver} · {vendor.Qt.__binding__}-{vendor.Qt.__binding_version__}"
+        _vq = getattr(vendor, "Qt", None) or sys.modules.get("vendor.Qt")
+        _bind = getattr(_vq, "__binding__", "Qt") if _vq is not None else "Qt"
+        _bver = getattr(_vq, "__binding_version__", "") if _vq is not None else ""
+        self.ver = f"{__version__} · Python-{py_ver} · {_bind}-{_bver}"
         self.setupUi(self)
         self.icon_path = os.path.dirname(__file__)
 
         self.setWindowTitle('Multi Script Editor v%s' % self.ver)
         self.setObjectName('pw_scriptEditor')
+        if self.embedded:
+            self.setWindowFlags(Qt.Widget)
         # widgets
         self.out = outputWidget.outputClass()
         self.out_ly.addWidget(self.out)
@@ -508,8 +520,57 @@ class scriptEditorClass(QMainWindow, ui.Ui_scriptEditor):
         return action_icon
 
     def __del__(self):
-        if hasattr(self, 'tab'):
-            self.saveSession()
+        try:
+            self._stop_lifecycle_hooks()
+        except Exception:
+            pass
+
+
+    def _ui_is_alive(self):
+        """False when host (e.g. Gaffer) already destroyed embedded Qt widgets."""
+        if getattr(self, "_ui_torn_down", False):
+            return False
+        return qt_object_is_alive(getattr(self, "tab", None))
+
+    def _stop_lifecycle_hooks(self):
+        """Stop timers / quit hooks so they cannot touch deleted widgets."""
+        for timer_name in ("autosave_timer", "session_save_timer", "status_bar_timer"):
+            timer = getattr(self, timer_name, None)
+            if timer is None:
+                continue
+            try:
+                timer.stop()
+            except RuntimeError:
+                pass
+            try:
+                timer.timeout.disconnect()
+            except (RuntimeError, TypeError):
+                pass
+        app = QApplication.instance()
+        if app is not None:
+            try:
+                app.aboutToQuit.disconnect(self._save_session_on_app_quit)
+            except (RuntimeError, TypeError):
+                pass
+
+    def prepare_for_host_close(self):
+        """Persist once (if UI still alive), then detach lifecycle hooks."""
+        if getattr(self, "_ui_torn_down", False):
+            return
+        try:
+            if self._ui_is_alive():
+                self._save_session_on_app_quit()
+        except RuntimeError:
+            pass
+        self._stop_lifecycle_hooks()
+        self._ui_torn_down = True
+
+    def eventFilter(self, obj, event):
+        panel = getattr(self, "_embeddedPanel", None)
+        if panel is not None and obj is panel:
+            if event.type() == QEvent.DeferredDelete:
+                self.prepare_for_host_close()
+        return super(scriptEditorClass, self).eventFilter(obj, event)
 
     def mse_help(self):
         from docs.constants import HELP_TEXT
@@ -707,16 +768,31 @@ class scriptEditorClass(QMainWindow, ui.Ui_scriptEditor):
     def _save_session_on_app_quit(self):
         if getattr(self, '_session_shutdown_saved', False):
             return
+        if getattr(self, '_ui_torn_down', False):
+            return
         if not hasattr(self, '_presenter'):
+            return
+        if not self._ui_is_alive():
+            self._stop_lifecycle_hooks()
+            self._ui_torn_down = True
             return
         self._session_shutdown_saved = True
 
-        self.saveSession()
-        self.saveSettings()
-        if hasattr(self, '_presenter'):
-            self._presenter.remove_backup()
+        try:
+            self.saveSession()
+            self.saveSettings()
+            if hasattr(self, '_presenter'):
+                self._presenter.remove_backup()
+        except RuntimeError:
+            pass
+        finally:
+            self._stop_lifecycle_hooks()
+            self._ui_torn_down = True
+
 
     def _schedule_session_autosave(self, *args):
+        if getattr(self, '_ui_torn_down', False) or not self._ui_is_alive():
+            return
         if hasattr(self, 'session_save_timer'):
             self.session_save_timer.start(1000)
 
@@ -877,10 +953,10 @@ class scriptEditorClass(QMainWindow, ui.Ui_scriptEditor):
             font_data = font_data.copy()
 
         if not font_data:
-            font_data = {'pointSize': 10}
+            font_data = {'pointSize': 13}
 
         if zoom_delta:
-            font_data['pointSize'] = max(1, font_data.get('pointSize', 10) + zoom_delta)
+            font_data['pointSize'] = max(1, font_data.get('pointSize', 13) + zoom_delta)
 
         secondary_default = max(1, int(font_data.get('pointSize', 10) * 0.9))
 
@@ -904,7 +980,7 @@ class scriptEditorClass(QMainWindow, ui.Ui_scriptEditor):
             self.tab.set_start_font(font_data)
 
             out_font_data = font_data.copy()
-            secondary_default = max(1, int(font_data.get('pointSize', 10) * 0.9))
+            secondary_default = max(1, int(font_data.get('pointSize', 13) * 0.9))
 
             if 'output_text_size' in colors:
                 out_font_data['pointSize'] = max(1, int(colors['output_text_size']))
@@ -916,7 +992,7 @@ class scriptEditorClass(QMainWindow, ui.Ui_scriptEditor):
 
             base_font = QFont(font_data.get('family', ''))
             base_font.setStyleHint(QFont.Monospace)
-            base_font.setPointSize(font_data.get('pointSize', 10))
+            base_font.setPointSize(font_data.get('pointSize', 13))
             self.theme_font = QFont(base_font)
 
             tooltip_font = QFont(base_font)
@@ -951,8 +1027,20 @@ class scriptEditorClass(QMainWindow, ui.Ui_scriptEditor):
             if hasattr(self, 'explorer_widget'):
                 self.explorer_widget.apply_theme(colors, outline_font)
 
+            # Options override for typewriter/theme font on tabs
+            use_theme_tabs = self._current_settings.get(
+                'use_theme_font_on_tabs',
+                colors.get('use_theme_font_on_tabs', colors.get('use_theme_font_on_tab_label', False)),
+            )
+            colors['use_theme_font_on_tabs'] = use_theme_tabs
+            colors['use_theme_font_on_tab_label'] = use_theme_tabs
+            if hasattr(self, 'themeFontOnTabs_act'):
+                self.themeFontOnTabs_act.blockSignals(True)
+                self.themeFontOnTabs_act.setChecked(bool(use_theme_tabs))
+                self.themeFontOnTabs_act.blockSignals(False)
+
             if hasattr(self, 'sidebar_tab_widget'):
-                if colors.get('use_theme_font_on_tabs', True):
+                if colors.get('use_theme_font_on_tabs', False):
                     sidebar_tab_font = QFont(base_font)
                 else:
                     sidebar_tab_font = QApplication.font("QTabBar")
@@ -1335,6 +1423,8 @@ class scriptEditorClass(QMainWindow, ui.Ui_scriptEditor):
 
     def _get_tabs_data(self, save_full_text=False):
         tabs = []
+        if not self._ui_is_alive():
+            return tabs
         index = self.tab.currentIndex()
         zoom_delta = getattr(self, '_temporary_zoom_delta', 0)
         for item in range(self.tab.count()):
@@ -1435,11 +1525,16 @@ class scriptEditorClass(QMainWindow, ui.Ui_scriptEditor):
     def saveSession(self, verbos=False):
         if not hasattr(self, '_presenter'):
             return
+        if not self._ui_is_alive():
+            return
         tabs = prepare_tabs_for_session_save(
             self._get_tabs_data(save_full_text=False)
         )
         path = self._presenter.save_session(tabs)
-        self.tab.mark_untitled_tabs_session_saved()
+        try:
+            self.tab.mark_untitled_tabs_session_saved()
+        except RuntimeError:
+            pass
         if verbos:
             self.out.showMessage('>>> Session saved: %s' % path.replace('\\', '/'))
 
@@ -1539,7 +1634,7 @@ class scriptEditorClass(QMainWindow, ui.Ui_scriptEditor):
             if font_data:
                 font = QFont(
                     font_data.get('family', ''),
-                    font_data.get('pointSize', 10),
+                    font_data.get('pointSize', 13),
                     font_data.get('weight', -1),
                     font_data.get('italic', False),
                 )
@@ -2076,7 +2171,7 @@ class scriptEditorClass(QMainWindow, ui.Ui_scriptEditor):
         try:
             data = self._current_settings
 
-            always_ontop = data.get('always_ontop', False)
+            always_ontop = data.get('always_ontop', False) and not self.embedded
             center = data.get('center', None)
             clear_exec = data.get('clear_execute', None)
             echo_exec = data.get('echo_execute', None)
@@ -2161,6 +2256,9 @@ class scriptEditorClass(QMainWindow, ui.Ui_scriptEditor):
                 self.tab.render_whitespace(show_whitespace)
                 self.out.render_whitespace(show_whitespace)
                 self.whitespace_act.setChecked(show_whitespace)
+            use_theme_font_on_tabs = data.get('use_theme_font_on_tabs', False)
+            if hasattr(self, 'themeFontOnTabs_act'):
+                self.themeFontOnTabs_act.setChecked(bool(use_theme_font_on_tabs))
             if font:
                 self.tab.set_start_font(font)
                 self.out.set_start_font(font)
@@ -2303,6 +2401,7 @@ class scriptEditorClass(QMainWindow, ui.Ui_scriptEditor):
         word_wrap = self.wordWrap_act.isChecked()
         always_ontop = self.always_ontop_act.isChecked()
         show_whitespace = self.whitespace_act.isChecked()
+        use_theme_font_on_tabs = self.themeFontOnTabs_act.isChecked() if hasattr(self, 'themeFontOnTabs_act') else False
 
         show_outline = self.showOutline_act.isChecked()
         show_explorer = self.showExplorer_act.isChecked()
@@ -2365,6 +2464,7 @@ class scriptEditorClass(QMainWindow, ui.Ui_scriptEditor):
             clear_execute=clear_execute,
             always_ontop=always_ontop,
             show_whitespace=show_whitespace,
+            use_theme_font_on_tabs=use_theme_font_on_tabs,
             font=font_data,
             show_outline=show_outline,
             show_explorer=show_explorer,
@@ -2426,6 +2526,14 @@ class scriptEditorClass(QMainWindow, ui.Ui_scriptEditor):
     def resizeEvent(self, event):
         self.adjustColmpeters()
         super(scriptEditorClass, self).resizeEvent(event)
+
+    def toggle_theme_font_on_tabs(self, checked=None):
+        if checked is None:
+            checked = self.themeFontOnTabs_act.isChecked()
+        self._current_settings['use_theme_font_on_tabs'] = bool(checked)
+        theme_name = self._current_settings.get('theme', 'Multi Script Editor')
+        self.applyTheme(theme_name)
+        self.saveSettings()
 
     def openLink(self, name, extra=""):
         webbrowser.open(f"{links[name]}{extra}")
@@ -2923,7 +3031,16 @@ class scriptEditorClass(QMainWindow, ui.Ui_scriptEditor):
     def autoSave(self):
         if not hasattr(self, '_presenter'):
             return
-        tabs = self._get_tabs_data(save_full_text=True)
+        if getattr(self, '_ui_torn_down', False) or not self._ui_is_alive():
+            self._stop_lifecycle_hooks()
+            self._ui_torn_down = True
+            return
+        try:
+            tabs = self._get_tabs_data(save_full_text=True)
+        except RuntimeError:
+            self._stop_lifecycle_hooks()
+            self._ui_torn_down = True
+            return
         if tabs == getattr(self, '_last_backup_tabs', None):
             return
         self._presenter.save_backup(tabs)
@@ -3335,6 +3452,96 @@ class scriptEditorClass(QMainWindow, ui.Ui_scriptEditor):
                 return True
         return super(scriptEditorClass, self).event(e)
 
+
+    def setExecuteWrapper(self, wrapper):
+        """Optional callable(func) that wraps eval/exec (e.g. Gaffer UndoScope)."""
+        self._executeWrapper = wrapper
+
+    def takeEmbeddedPanel(self):
+        """
+        Rebuild menubar / central widget into a plain QWidget for Gaffer tabs.
+        """
+        if self._embeddedPanel is not None:
+            return self._embeddedPanel
+
+        panel = QWidget()
+        panel.setObjectName('pw_scriptEditor_embedded')
+        panel.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+
+        oldMenuBar = self.menuBar()
+        if oldMenuBar is not None:
+            menuStrip = QWidget(panel)
+            menuStrip.setObjectName('pw_scriptEditor_menuStrip')
+            menuStrip.setMinimumHeight(26)
+            menuStrip.setStyleSheet(
+                'QWidget#pw_scriptEditor_menuStrip {'
+                '  background-color: #2b2b2b;'
+                '  border-bottom: 1px solid #454545;'
+                '}'
+                'QToolButton {'
+                '  color: #dfdfdf;'
+                '  background: transparent;'
+                '  border: none;'
+                '  border-radius: 3px;'
+                '  padding: 4px 10px;'
+                '}'
+                'QToolButton:hover { background-color: #4a4a4a; }'
+                'QToolButton::menu-indicator { image: none; width: 0px; }'
+            )
+            stripLayout = QHBoxLayout(menuStrip)
+            stripLayout.setContentsMargins(4, 1, 4, 1)
+            stripLayout.setSpacing(1)
+
+            for action in list(oldMenuBar.actions()):
+                oldMenuBar.removeAction(action)
+                menu = action.menu()
+                title = (action.text() or '').replace('&', '')
+                if menu is None:
+                    continue
+
+                menu.setTearOffEnabled(False)
+                menu.setTitle(title)
+                menu.setParent(panel, Qt.Popup)
+
+                btn = QToolButton(menuStrip)
+                btn.setText(title or 'Menu')
+                btn.setToolButtonStyle(Qt.ToolButtonTextOnly)
+                btn.setAutoRaise(True)
+                btn.setPopupMode(QToolButton.InstantPopup)
+                btn.setMenu(menu)
+                stripLayout.addWidget(btn)
+
+            stripLayout.addStretch(1)
+            layout.addWidget(menuStrip)
+            self.menubar = menuStrip
+            self.setMenuBar(QMenuBar(self))
+
+        if hasattr(self, 'takeCentralWidget'):
+            central = self.takeCentralWidget()
+        else:
+            central = self.centralWidget()
+            if central is not None:
+                central.setParent(None)
+        if central is not None:
+            central.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+            layout.addWidget(central, 1)
+
+        self.hide()
+        panel.setMinimumSize(320, 240)
+        self._embeddedPanel = panel
+        panel.installEventFilter(self)
+        panel.destroyed.connect(self._on_embedded_panel_destroyed)
+        return panel
+
+    def _on_embedded_panel_destroyed(self, *args):
+        # Widgets are already gone; only detach timers/quit hooks.
+        self._stop_lifecycle_hooks()
+        self._ui_torn_down = True
+
+
 try:
     from PySide2.QtCore import QTextCodec
     QTextCodec.setCodecForCStrings(QTextCodec.codecForName("UTF-8"))
@@ -3346,8 +3553,10 @@ except (ImportError, AttributeError):
         pass
 
 
-def create_editor_instance(parent=None):
-    w = scriptEditorClass(parent)
+
+
+def create_editor_instance(parent=None, embedded=False):
+    w = scriptEditorClass(parent, embedded=embedded)
     return w
 
 

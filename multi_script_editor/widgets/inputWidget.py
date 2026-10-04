@@ -9,6 +9,7 @@ from core.base_text_widget import BaseTextWidgetMixin, configure_tab_stops, reso
 from core.multi_cursor import MultiCursorManager
 from core.search_service import SearchService
 from core.settings_model import SettingsModel
+from core.qt_utils import apply_plain_text_font_size, event_pos, wheel_delta_y
 from vendor.Qt.QtCore import QPoint, Qt, QTimer, Signal
 from vendor.Qt.QtGui import (
     QColor,
@@ -514,7 +515,7 @@ class inputClass(BaseTextWidgetMixin, QPlainTextEdit):
             if not font_d:
                 font_d = self.data.get('font', {})
         family = font_d.get('family', 'monospace')
-        pointSize = font_d.get('pointSize', 10)
+        pointSize = font_d.get('pointSize', 13)
         italic = font_d.get('italic', False)
         weight = font_d.get('weight', 1.0)
 
@@ -616,7 +617,10 @@ class inputClass(BaseTextWidgetMixin, QPlainTextEdit):
         highlighter_class, self.comment_prefix, self.comment_suffix = self._get_highlighter_config(ext)
         self.hgl = highlighter_class(self.document(), colors)
         st = design.editorStyle(theme) if style is None else style
-        self.setStyleSheet(st)
+        self._theme_style = st or ""
+        self.setStyleSheet(self._theme_style)
+        if getattr(self, "fs", None):
+            self.setTextEditFontSize(self.fs)
         self.blockSignals(False)
         self.highlight_current_line()
 
@@ -975,7 +979,7 @@ class inputClass(BaseTextWidgetMixin, QPlainTextEdit):
             if font_data:
                 popup_font = QFont(
                     font_data.get('family', ''),
-                    font_data.get('pointSize', 10),
+                    font_data.get('pointSize', 13),
                     font_data.get('weight', -1),
                     font_data.get('italic', False),
                 )
@@ -1156,9 +1160,28 @@ class inputClass(BaseTextWidgetMixin, QPlainTextEdit):
             self.redo()
             return
 
-        # apply complete
-        if event.modifiers() == Qt.NoModifier and event.key() in [Qt.Key_Return , Qt.Key_Enter]:
-            if self.completer and self.completer.isVisible():
+        # Ctrl+Enter / Ctrl+Return -> execute selected (main Enter and numpad)
+        if (
+            (event.modifiers() & Qt.ControlModifier)
+            and not (event.modifiers() & Qt.AltModifier)
+            and not (event.modifiers() & Qt.ShiftModifier)
+            and event.key() in [Qt.Key_Return, Qt.Key_Enter]
+        ):
+            self.executeSignal.emit()
+            event.accept()
+            return
+
+        # apply complete / newline (plain Enter or Shift+Enter)
+        if (
+            event.key() in [Qt.Key_Return, Qt.Key_Enter]
+            and (
+                event.modifiers() == Qt.NoModifier
+                or event.modifiers() == Qt.ShiftModifier
+                or event.modifiers() == Qt.KeypadModifier
+                or event.modifiers() == (Qt.ShiftModifier | Qt.KeypadModifier)
+            )
+        ):
+            if self.completer and self.completer.isVisible() and event.modifiers() == Qt.NoModifier:
                 self._skip_autocomplete_once = True
                 self.completer.applyCurrentComplete()
                 return
@@ -1186,6 +1209,8 @@ class inputClass(BaseTextWidgetMixin, QPlainTextEdit):
                 cursor.insertText(add)
                 self.setTextCursor(cursor)
                 return
+            QPlainTextEdit.keyPressEvent(self, event)
+            return
         # remove 4 spaces
         elif event.modifiers() == Qt.NoModifier and event.key() == Qt.Key_Backspace:
             cursor = self.textCursor()
@@ -1225,9 +1250,7 @@ class inputClass(BaseTextWidgetMixin, QPlainTextEdit):
         elif event.modifiers() == Qt.ControlModifier and event.key() == Qt.Key_PageDown:
             self._cycle_tab(1)
             return
-        # ignore Shift + Enter
-        elif event.modifiers() == Qt.ShiftModifier and event.key() in [Qt.Key_Return , Qt.Key_Enter]:
-            return
+        # Shift+Enter handled above as newline
         # increase indent
         elif event.key() == Qt.Key_Tab:
             if self.completer:
@@ -2595,16 +2618,43 @@ class inputClass(BaseTextWidgetMixin, QPlainTextEdit):
             QPlainTextEdit.dropEvent(self,event)
 
     def wheelEvent(self, event):
-        if event.modifiers() == Qt.ControlModifier:
-            if self.completer:
-                self.completer.updateCompleteList()
-            if event.angleDelta().y() > 0:
-                self.changeFontSize(True)
-            else:
-                self.changeFontSize(False)
-        else:
-            QPlainTextEdit.wheelEvent(self, event)
+        # Match output log: Ctrl+wheel changes text size only.
+        if event.modifiers() & Qt.ControlModifier:
+            delta_y = wheel_delta_y(event)
+            if delta_y != 0:
+                if self.completer:
+                    self.completer.updateCompleteList()
+                self.changeFontSize(delta_y > 0)
+                event.accept()
+                return
+        QPlainTextEdit.wheelEvent(self, event)
 
+    def setTextEditFontSize(self, size):
+        """Zoom editor text via stylesheet+font (theme QSS alone does not resize)."""
+        theme_style = getattr(self, "_theme_style", None)
+        apply_plain_text_font_size(
+            self,
+            size,
+            theme_style=theme_style,
+            minimum=minimumFontSize,
+            maximum=30,
+        )
+
+    def changeFontSize(self, increase):
+        """Ctrl+wheel zooms only this editor's text (not the whole UI)."""
+        if hasattr(self, "_line_num_size_cache"):
+            try:
+                delattr(self, "_line_num_size_cache")
+            except Exception:
+                pass
+        BaseTextWidgetMixin.changeFontSize(self, bool(increase))
+        parent = self.parent()
+        line_num = getattr(parent, "lineNum", None) or getattr(self, "lineNum", None)
+        if line_num is not None:
+            try:
+                line_num.update()
+            except RuntimeError:
+                pass
 
     def insertFromMimeData (self, source ):
         text = source.text()
@@ -2615,7 +2665,7 @@ class inputClass(BaseTextWidgetMixin, QPlainTextEdit):
 
         if event.modifiers() & Qt.ControlModifier:
             # Add cursor on Ctrl+Click
-            cursor = self.cursorForPosition(event.pos())
+            cursor = self.cursorForPosition(event_pos(event))
             self.multi_cursor_manager.add_cursor_at(cursor)
             self.highlight_current_line()
             return

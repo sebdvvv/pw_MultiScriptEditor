@@ -26,6 +26,8 @@ class aboutClass(QDialog, about_UIs.Ui_Dialog):
 text = '''Paul Winex 2018
 Any question or bug report: paulwinex@gmail.com
 
-Carlos Rico Adega 2026 (Python 3, PySide2/6)
+Carlos Rico Adega 2026 (Python 3, PySide2/6, Blender port)
 Any question or bug report: carlos.rico.3d@gmail.com
+
+Sebastien Durand 2026 — Gaffer port (native Editor)
 '''

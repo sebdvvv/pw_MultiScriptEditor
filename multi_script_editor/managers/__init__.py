@@ -41,28 +41,42 @@ def getMayaContextMenu(*args):
     return _maya.contextMenu(*args)
 ###################################################################
 
+# GAFFER
+def gafferCompleter(*args):
+    from . import _gaffer
+    return _gaffer.completer(*args)
+
+def gafferDropEvent(*args):
+    from . import _gaffer
+    return _gaffer.wrapDroppedText(*args)
+###################################################################
+
 
 contextCompleters = dict(
     nuke=nukeCompleter,
     hou=houdiniCompleter,
-    maya=mayaCompleter
+    maya=mayaCompleter,
+    gaffer=gafferCompleter,
 )
 
 contextMenus = dict(
     hou=getHoudiniContextMenu,
     nuke=getNukeContextMenu,
-    maya=getMayaContextMenu
+    maya=getMayaContextMenu,
+    # gaffer: no extra host menu — File/Tools/Run/Options/Help are enough
 )
 
 dropEvents = dict(
     maya=mayaDropEvent,
-    hou=houdiniDropEvent
+    hou=houdiniDropEvent,
+    gaffer=gafferDropEvent,
 )
 
 autoImport = dict(
     hou='import hou\n',
     nuke='import nuke\n',
-    blender='import bpy\n'
+    blender='import bpy\n',
+    gaffer='import Gaffer\nimport GafferUI\nimport IECore\n',
 )
 context = None
 
@@ -81,6 +95,9 @@ elif 'nuke' in main.__dict__ or 'nuke' in exec_name:
 elif 'bpy' in sys.modules or 'blender' in exec_name:
     context = 'blender'
     from . import _blender as _blender
+elif 'Gaffer' in sys.modules or 'Gaffer' in main.__dict__ or 'gaffer' in exec_name:
+    context = 'gaffer'
+    # Lazy: _gaffer bootstraps Qt; import only when actually in Gaffer
 
 
 

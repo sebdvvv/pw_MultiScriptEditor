@@ -43,6 +43,9 @@ class SettingsModel:
                 appData = bpy.utils.user_resource('CONFIG')
             except Exception:
                 appData = None
+        elif managers.context == 'gaffer':
+            home = os.getenv('HOME') or os.getenv('USERPROFILE') or os.path.expanduser('~')
+            appData = os.path.join(home, 'gaffer') if home else None
         else:
             home = os.getenv('HOME') or os.path.expanduser('~')
             appData = home
@@ -233,7 +236,7 @@ class SettingsModel:
                     always_ontop=False,
                     show_whitespace=True,
                     highlight_all_occurrences=True,
-                    font={"family": "monospace", "pointSize": 12, "weight": 1, "italic": False},
+                    font={"family": "monospace", "pointSize": 10, "weight": 1, "italic": False},
                     recent_files=[],
                     recent_commands=[],
                     randomize_custom_at_startup=False,

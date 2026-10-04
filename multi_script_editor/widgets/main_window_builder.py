@@ -89,6 +89,8 @@ class ScriptEditorUIBuilder:
         configure(editor.houdini_envs_act, lambda: editor.openLink('houdini_envs'), 'houdini')
         configure(editor.maya_cmds_act, lambda: editor.openLink('maya_cmds'), 'maya')
         configure(editor.nuke_dev_guide_act, lambda: editor.openLink('nuke_dev_guide'), 'nuke')
+        configure(editor.gaffer_docs_act, lambda: editor.openLink('gaffer_docs'), 'python')
+        configure(editor.gaffer_node_reference_act, lambda: editor.openLink('gaffer_node_reference'), 'python')
         configure(editor.qt_docs_act, lambda: editor.openLink(f"qt{'6' if vendor.Qt.IsPySide6 else '5'}_docs"), 'qt')
         configure(editor.qt_modules_act, lambda: editor.openLink(f"qt{'6' if vendor.Qt.IsPySide6 else '5'}_modules"), 'qt')
         configure(editor.about_act, editor.about, 'about')
@@ -131,6 +133,7 @@ class ScriptEditorUIBuilder:
         configure(editor.print_command_act, checkable=True)
         configure(editor.clear_exec_act, editor.show_clear_exec, shortcut='Ctrl+Alt+C', context=Qt.WindowShortcut, checkable=True)
         configure(editor.whitespace_act, editor.render_whitespace, shortcut='Ctrl+Shift+W', context=Qt.WindowShortcut, checkable=True)
+        configure(editor.themeFontOnTabs_act, editor.toggle_theme_font_on_tabs, checkable=True)
         configure(editor.out_wordWrap_act, editor.out.wordWrap, shortcut='Ctrl+Alt+W', context=Qt.WindowShortcut, checkable=True)
         configure(editor.wordWrap_act, editor.tab.wordWrap, shortcut='Alt+W', context=Qt.WindowShortcut, checkable=True)
         configure(editor.moveLineUp_act, editor.tab.move_line_up, 'move_line_up', 'Alt+Up', Qt.WindowShortcut)
@@ -174,7 +177,7 @@ class ScriptEditorUIBuilder:
             editor.execSel_act,
             editor.executeSelected,
             shortcut=('Ctrl+Return', 'Ctrl+Enter'),
-            context=Qt.WidgetWithChildrenShortcut,
+            context=Qt.ApplicationShortcut,
         )
         configure(
             editor.execAll_act,
@@ -380,6 +383,8 @@ class ScriptEditorUIBuilder:
             editor.nextBookmark_act: "Navigate to the next bookmark",
             editor.nextSelection_act: "Move to the next selection",
             editor.nuke_dev_guide_act: "Open Nuke Developer Guide",
+            editor.gaffer_docs_act: "Open Gaffer documentation",
+            editor.gaffer_node_reference_act: "Open Gaffer node / Python reference",
             editor.occurrencesCaseSensitive_act: "If enabled, case sensitive will be used when selecting occurrences",
             editor.openManual_act: "Open the GitHub repository and manual",
             editor.out_wordWrap_act: "Toggle word wrap in the output panel",
@@ -432,6 +437,7 @@ class ScriptEditorUIBuilder:
             editor.unfold_all_act: "Unfold all code blocks",
             editor.versionControl_act: "Toggle Git version control features",
             editor.whitespace_act: "Show or hide whitespace characters in the editor",
+            editor.themeFontOnTabs_act: "Use the monospace editor font on tab labels",
             editor.wordWrap_act: "Toggle word wrap in the editor",
             editor.zoom_in_act: "Zoom in the editor font size",
             editor.zoom_out_act: "Zoom out the editor font size",

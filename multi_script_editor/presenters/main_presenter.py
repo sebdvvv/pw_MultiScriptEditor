@@ -98,7 +98,14 @@ class MainPresenter:
         def close_callback():
             self.view.close()
 
-        self.execution_manager.run_command(command, namespace, output_callback, close_callback)
+        def do_exec():
+            self.execution_manager.run_command(command, namespace, output_callback, close_callback)
+
+        wrapper = getattr(self.view, '_executeWrapper', None)
+        if callable(wrapper):
+            wrapper(do_exec)
+        else:
+            do_exec()
 
     def request_autocomplete(self, text, line, column, namespace, fuzzy, context):
         """

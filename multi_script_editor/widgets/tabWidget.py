@@ -1637,7 +1637,7 @@ class tabWidgetClass(QTabWidget):
         if not colors:
             colors = design.defaultColors
 
-        self._use_theme_font_on_tab_label = colors.get('use_theme_font_on_tab_label', True)
+        self._use_theme_font_on_tab_label = colors.get('use_theme_font_on_tab_label', colors.get('use_theme_font_on_tabs', False))
 
         for i in range(self.count()):
             cont = self.widget(i)
@@ -1650,7 +1650,7 @@ class tabWidgetClass(QTabWidget):
         elif 'textsize' in colors:
             self._tab_text_size = float(colors['textsize'])
         else:
-            self._tab_text_size = 10.0
+            self._tab_text_size = 9.0
 
         ss = self.styleSheet()
         font_match = re.search(r'/\*TAB_FONT_START\*/.*/\*TAB_FONT_END\*/', ss, flags=re.DOTALL)
@@ -1685,7 +1685,7 @@ class tabWidgetClass(QTabWidget):
                 current_widget.edit.setFocus()
 
     def _apply_tab_font(self, font):
-        use_theme_font = getattr(self, '_use_theme_font_on_tab_label', True)
+        use_theme_font = getattr(self, '_use_theme_font_on_tab_label', False)
         if use_theme_font:
             tab_font = QFont(font)
             family = tab_font.family()
@@ -1699,7 +1699,8 @@ class tabWidgetClass(QTabWidget):
             if pt_size > 0:
                 custom_size = pt_size * 0.8
             else:
-                custom_size = tab_font.pixelSize() * 0.8 if tab_font.pixelSize() > 0 else 10.0
+                custom_size = tab_font.pixelSize() * 0.8 if tab_font.pixelSize() > 0 else 9.0
+        custom_size = max(1.0, float(custom_size))
 
         if pt_size > 0:
             tab_font.setPointSizeF(custom_size)

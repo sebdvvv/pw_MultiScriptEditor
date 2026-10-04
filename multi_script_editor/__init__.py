@@ -60,6 +60,17 @@ def showNuke(panel=False):
     return _nuke.show(panel)
 
 
+# GAFFER
+def showGaffer(scriptNode=None):
+    """
+    Open Multi Script Editor as a dockable GafferUI.Editor tab.
+    If scriptNode is None, uses the active ScriptWindow's script.
+    """
+    from .managers import _gaffer
+
+    return _gaffer.show(scriptNode)
+
+
 def show(*args, **kwargs):
     from . import managers
     if managers.context == 'hou':
@@ -72,6 +83,8 @@ def show(*args, **kwargs):
         return showNuke(kwargs.get('panel', False))
     elif managers.context == 'blender':
         return showBlender()
+    elif managers.context == 'gaffer':
+        return showGaffer(kwargs.get('scriptNode'))
 
     from . import scriptEditor
     return scriptEditor.show()

@@ -24,6 +24,7 @@ or embedded in another application. The main purpose for integration - the abili
   - Houdini 19+
   - Nuke 15+
   - Maya 2024+
+  - Gaffer (native dockable Editor; tested 1.7.3.1 / PySide6)
 
 If necessary, you can extend this to make your own integration module.
 The main pre condition - Should be used Python 3+.
@@ -51,12 +52,19 @@ The main pre condition - Should be used Python 3+.
   - Context completion for function pm.createNode and cmds.createNode with existing Maya node types
 
 
+### Gaffer features
+  - Native dockable panel: Window -> Multi Script Editor
+  - Namespace like the built-in Python Editor: `root`, `Gaffer`, `GafferUI`, `IECore`, `imath`
+  - Graph edits wrapped in `Gaffer.UndoScope` + the editor context
+  - `root['...']` completion and Alt-drop path wrapping
+
 # How to install
 
-[Standalone](https://github.com/nebukadhezer/pw_MultiScriptEditor#standalone)
-[Houdini install](https://github.com/nebukadhezer/pw_MultiScriptEditor#houdini-13)
-[Maya install](https://github.com/nebukadhezer/pw_MultiScriptEditor#maya)
-[Nuke install](https://github.com/nebukadhezer/pw_MultiScriptEditor#nuke)
+[Standalone](readme_standalone.md)
+[Houdini](readme_houdini.md)
+[Maya](readme_maya.md)
+[Nuke](readme_nuke.md)
+[Gaffer](readme_gaffer.md)
 
 You can use single module installation for each case. Just extract module `multi_script_editor`
 to somewhere (no spaces and non ascii characters in path) and add this path to PYTHONPATH before start your app.

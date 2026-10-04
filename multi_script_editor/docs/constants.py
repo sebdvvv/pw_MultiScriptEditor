@@ -100,6 +100,7 @@ TESTED_TEXT = """Supported applications:
     Autodesk Maya
     SideFx Houdini
     The Foundry Nuke
+    Image Engine Gaffer
 
 Tested on:
 
@@ -121,4 +122,6 @@ Tested on:
         Linux   · Python-3.11.12 · PySide6-6.9.2
         Linux   · Python-3.10.13 · PySide2-5.15.2.1
         Windows · Python-3.13.14 · PySide6-6.11.1
-        Windows · Python-3.10.11 · PySide2-5.15.2.1"""
+        Windows · Python-3.10.11 · PySide2-5.15.2.1
+
+    Gaffer 1.7.3.1 · Windows · PySide6"""

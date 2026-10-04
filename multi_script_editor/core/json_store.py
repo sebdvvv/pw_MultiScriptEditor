@@ -4,11 +4,17 @@ import os
 import tempfile
 from contextlib import contextmanager
 
-from vendor.Qt.QtCore import QLockFile
+try:
+    from vendor.Qt.QtCore import QLockFile
+except ImportError:  # Gaffer Qt.py shim / incomplete bindings
+    QLockFile = None
 
 
 @contextmanager
 def locked_json(path):
+    if QLockFile is None:
+        yield
+        return
     lock = QLockFile(path + '.lock')
     if not lock.tryLock(5000):
         raise OSError('Could not lock settings file: {0}'.format(path))
