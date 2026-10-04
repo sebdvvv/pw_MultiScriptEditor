@@ -1,5 +1,6 @@
 import os
 import re
+from qtCompat import qt_exec
 
 import vendor.Qt
 from vendor.Qt.QtCore import QEvent, QRectF, QSize, Qt, QTimer, Signal
@@ -772,7 +773,7 @@ class tabWidgetClass(QTabWidget):
                 show_menus_action.triggered.connect(self.p.toggleMenus_act.trigger)
             menu.addAction(show_menus_action)
 
-        menu.exec_(QCursor.pos())
+        qt_exec(menu, QCursor.pos())
 
     def build_git_menu(self, git_menu, index):
         widget = self.widget(index)
@@ -868,14 +869,14 @@ class tabWidgetClass(QTabWidget):
 
     def git_commit_dialog(self, file_path):
         dlg = GitCommitDialog(parent=self.p, file_path=file_path)
-        if dlg.exec_():
+        if qt_exec(dlg):
             self.update_tab_git_status(self.currentIndex())
             if hasattr(self.p, 'updateStatusBarInfo'):
                 self.p.updateStatusBarInfo()
 
     def git_history_dialog(self, file_path):
         dlg = GitHistoryDialog(parent=self.p, file_path=file_path)
-        dlg.exec_()
+        qt_exec(dlg)
 
     def _apply_parent_theme_font(self, widget, fallback_font=None):
         font = getattr(self.p, 'theme_font', None) or fallback_font
@@ -908,7 +909,7 @@ class tabWidgetClass(QTabWidget):
             msg_box.button(QMessageBox.No).setFocus()
             fallback_font = getattr(self.p, 'current_outline_font', self.font())
             self._apply_parent_theme_font(msg_box, fallback_font)
-            reply = msg_box.exec_()
+            reply = qt_exec(msg_box)
 
         if reply == QMessageBox.Yes:
             success, msg = GitManager.discard_changes(file_path)
@@ -1072,7 +1073,7 @@ class tabWidgetClass(QTabWidget):
         msg_box.button(QMessageBox.No).setFocus()
         self._apply_parent_theme_font(msg_box)
 
-        reply = msg_box.exec_()
+        reply = qt_exec(msg_box)
 
         if reply == QMessageBox.Yes:
             try:
@@ -1091,7 +1092,7 @@ class tabWidgetClass(QTabWidget):
                 err_box.setWindowTitle('Delete File Error')
                 err_box.setText('Could not delete file:\n%s' % str(e))
                 self._apply_parent_theme_font(err_box)
-                err_box.exec_()
+                qt_exec(err_box)
 
     def reloadFile(self, index=None):
         if index is None or isinstance(index, bool):
@@ -1827,7 +1828,7 @@ class tabWidgetClass(QTabWidget):
         msg_box.setDefaultButton(button)
         button.setFocus()
         self._apply_parent_theme_font(msg_box)
-        msg_box.exec_()
+        qt_exec(msg_box)
         return msg_box.clickedButton() == yes_button
 
 
@@ -1943,4 +1944,4 @@ if __name__ == '__main__':
     app = QApplication([])
     w = tabWidgetClass()
     w.show()
-    app.exec_()
+    qt_exec(app)
