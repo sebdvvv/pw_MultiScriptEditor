@@ -154,6 +154,32 @@ class outputClass(BaseTextWidgetMixin, QPlainTextEdit):
             menu.addAction(output_to_tab)
             menu.addAction(save_output)
 
+        # Clear sits just before the standard Copy action.
+        copy_action = None
+        for act in menu.actions():
+            text = (act.text() or "").replace("&", "").strip().lower()
+            if text == "copy":
+                copy_action = act
+                break
+
+        clear_act = QAction("Clear", self)
+        clear_act.setStatusTip("Clear the output panel")
+        clear_act.setToolTip(clear_act.statusTip())
+        if "clear" in icons:
+            clear_act.setIcon(QIcon(icons["clear"]))
+        if hasattr(main_window, "clearHistory"):
+            clear_act.triggered.connect(main_window.clearHistory)
+        else:
+            clear_act.triggered.connect(self.clear)
+        clear_act.setEnabled(not self.document().isEmpty())
+
+        if copy_action is not None:
+            menu.insertAction(copy_action, clear_act)
+        elif first_action is not None:
+            menu.insertAction(first_action, clear_act)
+        else:
+            menu.addAction(clear_act)
+
         menu.exec_(event.globalPos())
         del menu
 

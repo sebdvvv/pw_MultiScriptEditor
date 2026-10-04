@@ -10,6 +10,7 @@ from vendor.Qt.QtGui import (
     QPolygon,
 )
 from vendor.Qt.QtWidgets import QApplication, QWidget
+from core.qt_utils import event_pos
 
 
 class lineNumberBarClass(QWidget):
@@ -315,12 +316,12 @@ class lineNumberBarClass(QWidget):
         QWidget.paintEvent(self, event)
 
     def mouseMoveEvent(self, event):
-        click_y = event.y()
+        click_y = event_pos(event).y()
         block = self._block_at_y(click_y)
         hover_block = block.blockNumber() if block is not None else -1
 
-        hover_in_bookmark_area = (event.x() < 20)
-        hover_in_folding_area = (event.x() > self.width() - 20)
+        hover_in_bookmark_area = (event_pos(event).x() < 20)
+        hover_in_folding_area = (event_pos(event).x() > self.width() - 20)
 
         changed = False
         if getattr(self, 'hover_block_number', -1) != hover_block:
@@ -346,10 +347,10 @@ class lineNumberBarClass(QWidget):
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
-            block = self._block_at_y(event.y())
+            block = self._block_at_y(event_pos(event).y())
             if block is not None:
                 # Check if click is on the right side (chevron / folding region)
-                if event.x() > self.width() - 20:
+                if event_pos(event).x() > self.width() - 20:
                     block_num = block.blockNumber()
                     if (
                         hasattr(self.edit, 'folding_regions')
@@ -364,7 +365,7 @@ class lineNumberBarClass(QWidget):
                         )
                         self.request_repaint()
                         return
-                elif event.x() < 20:
+                elif event_pos(event).x() < 20:
                     # Toggle bookmark on left margin click
                     block_num = block.blockNumber()
                     if hasattr(self.edit, 'toggle_bookmark'):
