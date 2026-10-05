@@ -24,7 +24,7 @@ or embedded in another application. The main purpose for integration - the abili
   - Houdini 19+
   - Nuke 15+
   - Maya 2024+
-  - Gaffer (native dockable Editor; tested 1.7.3.1 / PySide6)
+  - Gaffer (native dockable Editor; tested 1.6+ / PySide6)
 
 If necessary, you can extend this to make your own integration module.
 The main pre condition - Should be used Python 3+.
